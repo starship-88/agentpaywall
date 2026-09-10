@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Env / secrets — never commit
+.env
+.env.local
+.env.*.local
+*.pem
+*.secret
+
+# Build
+dist/
+dist-ssr/
+build/
+target/
+*.wasm
+
+# Logs & OS
+logs/
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Tooling
+.oxlintcache
+*.tsbuildinfo
+
+# Stellar CLI local keys (if someone runs `stellar keys generate` in-repo)
+.stellar/
+
+# Agent scratch (cloud sessions)
+agent-tools/

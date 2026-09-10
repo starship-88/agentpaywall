@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --color-ink: #07131f;
+  --color-panel: #0d1d2e;
+  --color-line: #1e3a4f;
+  --color-mint: #7ee0c8;
+  --color-gold: #e7c07a;
+  --color-warn: #f3a27a;
+  --color-ok: #8fd18b;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: local("IBM Plex Sans");
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #12324a 0%, transparent 55%),
+    radial-gradient(800px 400px at 100% 0%, #1a2e22 0%, transparent 50%),
+    var(--color-ink);
+  color: #e8f1f6;
+  font-family: var(--font-sans);
+}
+
+button,
+input {
+  font: inherit;
+}

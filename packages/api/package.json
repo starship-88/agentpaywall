@@ -1,0 +1,19 @@
+{
+  "name": "@agentpaywall/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "x402 Exact scheme resource server — GET /v1/fx paywall on Stellar testnet USDC",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@x402/core": "~2.12.0",
+    "@x402/express": "~2.12.0",
+    "@x402/stellar": "~2.12.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0"
+  }
+}

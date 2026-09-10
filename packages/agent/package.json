@@ -1,0 +1,21 @@
+{
+  "name": "@agentpaywall/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CLI payer: GET paid endpoint, handle 402, sign Soroban auth entries, retry",
+  "bin": {
+    "agentpaywall": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "until-cap": "node src/index.js --until-cap"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^14.6.1",
+    "@x402/core": "~2.12.0",
+    "@x402/fetch": "~2.12.0",
+    "@x402/stellar": "~2.12.0",
+    "dotenv": "^16.6.1"
+  }
+}

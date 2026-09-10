@@ -1,0 +1,23 @@
+{
+  "name": "agentpaywall",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Per-request USDC paywall for APIs via x402 on Stellar, with a Soroban daily spend cap.",
+  "workspaces": [
+    "packages/api",
+    "packages/agent",
+    "packages/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev:api",
+    "dev:api": "npm run dev -w @agentpaywall/api",
+    "dev:web": "npm run dev -w @agentpaywall/web",
+    "dev:agent": "npm run start -w @agentpaywall/agent",
+    "build:web": "npm run build -w @agentpaywall/web",
+    "demo": "bash scripts/demo.sh",
+    "deploy:testnet": "bash scripts/deploy-testnet.sh"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
