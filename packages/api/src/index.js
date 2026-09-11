@@ -5,6 +5,7 @@ import { DOCS, OZ_KEY_GEN_URL, USDC_ISSUER, USDC_SAC } from "./constants.js";
 import { listPairs, quote } from "./fx.js";
 import { loadAccount } from "./horizon.js";
 import { createPaywall } from "./paywall.js";
+import { loadSpendAccountStatus } from "./spend-account-view.js";
 import { createStore } from "./store.js";
 
 const store = createStore(config.dailyCapUsdc, config.priceBaseUnits);
@@ -33,17 +34,19 @@ app.get("/health", (_req, res) => {
 });
 
 app.get("/v1/status", async (_req, res) => {
-  let recipientHorizon = null;
-  if (config.recipientClassic) {
-    try {
-      recipientHorizon = await loadAccount(config.horizonUrl, config.recipient);
-    } catch (err) {
-      recipientHorizon = { exists: false, reason: err.message };
-    }
-  }
+  const [recipientHorizon, spendAccount] = await Promise.all([
+    config.recipientClassic
+      ? loadAccount(config.horizonUrl, config.recipient).catch((err) => ({
+          exists: false,
+          reason: err.message,
+        }))
+      : Promise.resolve(null),
+    loadSpendAccountStatus(),
+  ]);
   res.json({
     service: "AgentPaywall",
     ...liveStatusFields(),
+    spendAccount,
     price: config.price,
     priceBaseUnits: config.priceBaseUnits.toString(),
     usdc: { issuer: USDC_ISSUER, sac: USDC_SAC },
@@ -64,8 +67,13 @@ app.get("/v1/pairs", (_req, res) => {
   res.json({ pairs: listPairs() });
 });
 
-app.get("/v1/activity", (_req, res) => {
-  res.json({ events: store.events(), budget: store.snapshot() });
+app.get("/v1/activity", async (_req, res) => {
+  const spendAccount = await loadSpendAccountStatus();
+  res.json({
+    events: store.events(),
+    budget: store.snapshot(),
+    spendAccount,
+  });
 });
 
 app.post("/v1/budget", (req, res) => {
@@ -76,9 +84,11 @@ app.post("/v1/budget", (req, res) => {
     res.json({
       ok: true,
       budget,
-      note:
-        config.mode === "live"
-          ? "Dashboard cap only. Live USDC settle is not gated by this number unless you deploy spend-account as the payer."
+      stubOnly: Boolean(config.spendAccountContractId),
+      note: config.spendAccountContractId
+        ? "Stub/UI only. This updates the in-memory dashboard store. It does not call set_daily_limit and does not move the live __check_auth cap."
+        : config.mode === "live"
+          ? "Live settle is gated by this daily cap before the facilitator is called when no spend-account C... is set."
           : "STUB dashboard cap. VERIFY: set OZ_API_KEY + STELLAR_RECIPIENT for live settle.",
     });
   } catch (err) {

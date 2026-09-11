@@ -36,10 +36,10 @@ after you have a funded testnet identity. The script prints a `C...` contract id
 
 ## VERIFY / live x402
 
-Live Exact settle does **not** require this contract. The agent pays with
-`createEd25519Signer` from a classic `G...` account. `__check_auth` only runs
-when *this* contract is the `from` on the USDC SAC `transfer`.
+Set `SPEND_ACCOUNT_CONTRACT_ID` to the C… this deploy printed. Live Exact uses that
+contract as SAC `transfer` `from`. `__check_auth` runs on every paid `/v1/fx`.
 
-Until that signer path exists, the UI / stub `--until-cap` demo is the cap
-you can show; on-chain enforcement is this contract after you deploy and
-re-point the payer.
+The agent signs with `STELLAR_RECIPIENT_SECRET` — the constructor **owner**
+ed25519 key (merchant G…), not a second invented owner. Fund the C… with
+testnet USDC. Dashboard `DAILY_CAP_USDC` is the stub/UI window; on-chain
+`daily_limit` is the live `--until-cap` demo.

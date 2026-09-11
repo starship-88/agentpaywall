@@ -40,9 +40,49 @@ function readHeader(req, name) {
   return v || req.get(name.toLowerCase()) || "";
 }
 
+function dailyCapBody(store, priceBaseUnits, onChain) {
+  const remaining = store.remainingBaseUnits();
+  return {
+    error: "DAILY_CAP_EXCEEDED",
+    message:
+      "Daily USDC spend cap would be exceeded. This request was not settled.",
+    remainingBaseUnits: remaining.toString(),
+    remainingUsdc: Number(remaining) / 10_000_000,
+    attemptedBaseUnits: priceBaseUnits.toString(),
+    onChain: Boolean(onChain),
+  };
+}
+
+function rejectDailyCap(res, store, priceBaseUnits, onChain) {
+  const body = dailyCapBody(store, priceBaseUnits, onChain);
+  res.set("Cache-Control", "no-store");
+  return res.status(402).json(body);
+}
+
+function isOnChainCapFailure(settleResult) {
+  const raw = JSON.stringify(settleResult ?? {});
+  const lower = raw.toLowerCase();
+  return (
+    lower.includes("dailycapexceeded") ||
+    lower.includes("daily_cap_exceeded") ||
+    lower.includes("daily cap") ||
+    lower.includes("cap_hit") ||
+    /error\(\s*contract\s*,\s*#3\s*\)/.test(lower)
+  );
+}
+
 function explainSettleFailure(settleResult) {
   const raw = JSON.stringify(settleResult ?? {});
   const lower = raw.toLowerCase();
+  if (isOnChainCapFailure(settleResult)) {
+    return {
+      code: "DAILY_CAP_EXCEEDED",
+      message:
+        "Spend-account __check_auth refused the USDC transfer (DailyCapExceeded / cap_hit). On-chain daily cap would be exceeded.",
+      onChain: true,
+      details: settleResult,
+    };
+  }
   if (lower.includes("401") || lower.includes("unauthorized")) {
     return {
       code: "FACILITATOR_AUTH",
@@ -54,7 +94,7 @@ function explainSettleFailure(settleResult) {
     return {
       code: "NO_TRUSTLINE",
       message:
-        "USDC trustline missing on payer or recipient. Run node scripts/add-usdc-trustline.mjs",
+        "USDC trustline missing on recipient, or the spend-account C... has no SAC balance. Fund the contract with testnet USDC.",
     };
   }
   if (
@@ -65,13 +105,13 @@ function explainSettleFailure(settleResult) {
     return {
       code: "UNDERFUNDED",
       message:
-        "Payer USDC balance is too low. Fund the payer G... at https://faucet.circle.com (Stellar testnet).",
+        "Payer USDC balance is too low. When SPEND_ACCOUNT_CONTRACT_ID is set, fund that C... (not the classic G payer) at https://faucet.circle.com (Stellar testnet) or transfer USDC to the contract.",
     };
   }
   return {
     code: "SETTLE_FAILED",
     message:
-      "Facilitator could not settle the USDC transfer. See details; common causes are underfunded payer, missing trustline, or expired auth entry.",
+      "Facilitator could not settle the USDC transfer. See details; common causes are underfunded spend-account, missing USDC, or expired auth entry.",
     details: settleResult,
   };
 }
@@ -99,16 +139,7 @@ export function stubPaywall(config, store) {
 
     const spend = store.trySpend(config.priceBaseUnits);
     if (!spend.ok) {
-      const body = {
-        error: "DAILY_CAP_EXCEEDED",
-        message:
-          "Local dashboard cap would be exceeded (stub). Live settle does not use this gate.",
-        remainingBaseUnits: spend.remaining.toString(),
-        remainingUsdc: Number(spend.remaining) / 10_000_000,
-        onChain: false,
-      };
-      res.set("Cache-Control", "no-store");
-      return res.status(402).json(body);
+      return rejectDailyCap(res, store, config.priceBaseUnits, false);
     }
 
     store.log("paid", `Stub payment accepted for ${req.originalUrl}`, {
@@ -150,16 +181,27 @@ export async function livePaywall(config, store) {
   );
 
   resourceServer.onAfterSettle(() => {
+    if (config.spendAccountContractId) {
+      store.recordSpend(config.priceBaseUnits);
+    }
     store.log("paid", "OZ facilitator settled USDC transfer on stellar:testnet", {
       price: config.price,
       asset: USDC_SAC,
       payTo: config.recipient,
+      from: config.spendAccountContractId || "classic-g-payer",
     });
   });
   resourceServer.onSettleFailure((ctx) => {
-    store.log("error", "OZ facilitator settle failed", {
-      error: String(ctx?.error || ctx?.reason || "settle_failed"),
-    });
+    const blob = ctx?.error || ctx?.reason || ctx;
+    if (isOnChainCapFailure(blob)) {
+      store.log("cap", "On-chain DailyCapExceeded / cap_hit from spend-account __check_auth", {
+        error: String(blob),
+      });
+    } else {
+      store.log("error", "OZ facilitator settle failed", {
+        error: String(blob || "settle_failed"),
+      });
+    }
   });
 
   try {
@@ -205,13 +247,17 @@ export async function livePaywall(config, store) {
             pair: httpCtx?.getQueryParam?.("pair") || null,
           },
         }),
-        settlementFailedResponseBody: (_httpCtx, settleResult) => ({
-          contentType: "application/json",
-          body: {
-            error: "SETTLE_FAILED",
-            ...explainSettleFailure(settleResult),
-          },
-        }),
+        settlementFailedResponseBody: (_httpCtx, settleResult) => {
+          const explained = explainSettleFailure(settleResult);
+          const cap = explained.code === "DAILY_CAP_EXCEEDED";
+          return {
+            contentType: "application/json",
+            body: {
+              error: cap ? "DAILY_CAP_EXCEEDED" : "SETTLE_FAILED",
+              ...explained,
+            },
+          };
+        },
       },
     },
     resourceServer,
@@ -225,28 +271,70 @@ export async function livePaywall(config, store) {
       return next();
     }
 
+    const onChainFrom = Boolean(config.spendAccountContractId);
     const signature =
       readHeader(req, "PAYMENT-SIGNATURE") ||
       readHeader(req, "X-PAYMENT") ||
       "";
 
-    if (!signature) {
+    // In-process dashboard cap: stub + live classic G payer.
+    // Live spend-account: __check_auth is the gate — do not 402 before settle.
+    if (!onChainFrom && config.priceBaseUnits > store.remainingBaseUnits()) {
+      return rejectDailyCap(
+        res,
+        store,
+        config.priceBaseUnits,
+        Boolean(config.spendAccountContractId),
+      );
+    }
+
+    let reserved = false;
+    if (signature) {
+      if (!onChainFrom) {
+        const spend = store.trySpend(config.priceBaseUnits);
+        if (!spend.ok) {
+          return rejectDailyCap(
+            res,
+            store,
+            config.priceBaseUnits,
+            Boolean(config.spendAccountContractId),
+          );
+        }
+        reserved = true;
+      }
+    } else {
       store.log("402", `402 Payment Required (live) for ${req.originalUrl}`, {
         pair: req.query.pair || null,
       });
     }
 
+    const refundIfFailed = () => {
+      if (reserved) {
+        store.refund(config.priceBaseUnits);
+        reserved = false;
+      }
+    };
+
     const originalJson = res.json.bind(res);
+    const originalSend = res.send.bind(res);
     res.json = (body) => {
-      if (res.statusCode === 402 && signature) {
-        store.log("error", `Live paywall returned ${res.statusCode}`, {
-          error: body?.error || body?.code,
-        });
+      if (res.statusCode >= 400) {
+        refundIfFailed();
+        if (signature) {
+          store.log("error", `Live paywall returned ${res.statusCode}`, {
+            error: body?.error || body?.code,
+          });
+        }
       }
       return originalJson(body);
     };
+    res.send = (body) => {
+      if (res.statusCode >= 400) refundIfFailed();
+      return originalSend(body);
+    };
 
     return Promise.resolve(x402(req, res, next)).catch((err) => {
+      refundIfFailed();
       store.log("error", err.message || "x402 middleware error");
       if (!res.headersSent) {
         res.status(502).json({

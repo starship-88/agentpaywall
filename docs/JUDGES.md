@@ -22,17 +22,20 @@ Official network/asset/facilitator only:
 - USDC SAC: `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`
 - OZ facilitator: `https://channels.openzeppelin.com/x402/testnet`
 
-We do **not** ship a fabricated spend-account `C...` address. Deploy yours with `scripts/deploy-testnet.sh`.
+There is **no** official spend-account `C...` constant. Deploy yours with `scripts/deploy-testnet.sh`. This repo’s live demo instance (testnet, already deployed — not an official constant) is `CAPRBG7V5JQRGWNQ5Z5AKRQ4X46G3UJRQNVXLUKZIWHEHWBNAMBBNRR5`.
 
 ## Adversarial demo (cap hit)
 
-1. Open the web UI. Set daily cap to **0.002 USDC** (two paid requests at `$0.001`).
-2. In a terminal: `npm run start -w @agentpaywall/agent -- --until-cap`
-3. First request(s): **200** + mock USD-MXN.
-4. Next request: **402** `DAILY_CAP_EXCEEDED` (stub) **or** facilitator/`__check_auth` reject (live).
-5. Activity log shows `cap`. That is the product.
+**Live (judges path):** budget lives in `__check_auth`, not the bot config or the dashboard setter.
 
-Stub vs live is labeled on `/v1/status` (`mode` + `settle`). Stub proves the HTTP loop without an OZ key. Live Exact settle: README **Live settle checklist** (OZ key, Friendbot, Circle USDC, trustlines). Spend-account is optional and is not the live `from` today.
+1. Open the web UI. Daily cap / Spent / Remaining must show an **on-chain** badge and match `GET /v1/status` `spendAccount` (`remainingBaseUnits` is `0` after this instance’s `--until-cap` until the UTC day rolls).
+2. Human looks at **web remaining (on-chain)** — not the in-memory `DAILY_CAP_USDC` setter. That setter is stub/UI only and does **not** call `set_daily_limit`.
+3. `npm run start -w @agentpaywall/agent -- --until-cap` until **CAP_HIT** (`DailyCapExceeded` / `DAILY_CAP_EXCEEDED`).
+4. Cards stay at on-chain remaining `0`. Live Exact `from` is the C… above.
+
+**Stub** (no `SPEND_ACCOUNT_CONTRACT_ID`): set the in-memory cap to two quotes (`0.002` USDC at `$0.001`) and run the same loop. Proves the HTTP 402 → pay → 200 path without an OZ key.
+
+Stub vs live is labeled on `/v1/status` (`mode` + `settle` + `spendAccount.source`). When the contract id is set, `spendAccount.enforcesLiveTransfers` is true and the agent’s `from` is that C… — not a classic G payer.
 
 ## Why Stellar
 

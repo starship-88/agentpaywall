@@ -1,9 +1,7 @@
 /**
- * In-memory budget + activity log for the human UI.
- *
- * STUB: this IS the daily cap the paywall enforces.
- * LIVE: this mirrors intent for the dashboard; the Soroban spend-account
- *       `__check_auth` is the real gate once SPEND_ACCOUNT_CONTRACT_ID is set.
+ * In-memory daily USDC budget + activity log.
+ * Stub and live paywalls both gate on this window (UTC day).
+ * On-chain spend-account is a separate, optional `from` — not this store.
  */
 
 const MAX_EVENTS = 200;
@@ -86,8 +84,11 @@ export function createStore(initialCapUsdc, priceBaseUnits) {
     resetWindow() {
       spentBaseUnits = 0n;
       windowDay = utcDayKey();
-      push("info", "Human reset the stub spend window.");
+      push("info", "Human reset the spend window.");
       return this.snapshot();
+    },
+    remainingBaseUnits() {
+      return remainingBaseUnits();
     },
     /**
      * @returns {{ ok: true } | { ok: false, remaining: bigint }}
@@ -104,6 +105,17 @@ export function createStore(initialCapUsdc, priceBaseUnits) {
       }
       spentBaseUnits += amountBaseUnits;
       return { ok: true };
+    },
+    recordSpend(amountBaseUnits) {
+      rollWindow();
+      if (amountBaseUnits <= 0n) return;
+      spentBaseUnits += amountBaseUnits;
+    },
+    refund(amountBaseUnits) {
+      rollWindow();
+      if (amountBaseUnits <= 0n) return;
+      spentBaseUnits =
+        spentBaseUnits > amountBaseUnits ? spentBaseUnits - amountBaseUnits : 0n;
     },
     log(kind, message, extra) {
       push(kind, message, extra);

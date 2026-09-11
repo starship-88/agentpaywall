@@ -36,8 +36,9 @@ echo
 echo "OZ facilitator key:"
 echo "  https://channels.openzeppelin.com/testnet/gen  →  OZ_API_KEY"
 echo
-echo "Live x402 payTo is STELLAR_RECIPIENT (classic G...), not this contract."
-echo "Spend-account __check_auth is a follow-on if you make the contract the payer."
+echo "Live x402 from is SPEND_ACCOUNT_CONTRACT_ID (this C...) when set."
+echo "Owner secret on the agent: STELLAR_RECIPIENT_SECRET (constructor G...)."
+echo "Fund the contract with testnet USDC so Exact transfer can settle."
 echo
 
 if [[ "$NETWORK" != "stellar:testnet" ]]; then
@@ -52,7 +53,7 @@ fi
 if ! command -v stellar >/dev/null 2>&1; then
   echo "Stellar CLI not installed — skipping wasm deploy."
   echo "  https://developers.stellar.org/docs/tools/developer-tools/cli/install-cli"
-  echo "Live settle still works with a classic G... payer after the notes above."
+  echo "Live settle still works; set SPEND_ACCOUNT_CONTRACT_ID after you deploy to pay from the C..."
   exit 0
 fi
 

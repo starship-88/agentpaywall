@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# Local demo: stub 402 → pay → 200, then optional adversarial cap hit.
+# Local demo: unpaid 402 → agent pay → 200, then optional --until-cap.
+#
+# Live judges path (C-account, not the in-memory DAILY_CAP_USDC setter):
+#   1. Open the web UI. Remaining / spent / daily cap must be on-chain
+#      (GET /v1/status spendAccount.source=on-chain).
+#   2. npm run start -w @agentpaywall/agent -- --until-cap
+#   3. Loop until CAP_HIT (DailyCapExceeded). Dashboard remaining stays 0
+#      until the UTC day rolls. POST /v1/budget does not move set_daily_limit.
+# This demo instance (not an official constant):
+#   CAPRBG7V5JQRGWNQ5Z5AKRQ4X46G3UJRQNVXLUKZIWHEHWBNAMBBNRR5
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

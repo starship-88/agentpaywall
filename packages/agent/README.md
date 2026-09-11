@@ -8,6 +8,7 @@ npm run start -w @agentpaywall/agent -- --until-cap
 ```
 
 - **Stub API:** unsigned GET → 402 → `PAYMENT-SIGNATURE` retry (no chain).
-- **Live API:** `wrapFetchWithPaymentFromConfig` + `createEd25519Signer(secret, "stellar:testnet")` + `ExactStellarScheme`. Pass the raw `S...` string and CAIP-2 id — do not wrap a `Keypair`. Underfunded / missing trustline / bad OZ key print as those errors, not a generic throw.
+- **Live + spend-account:** Exact `from` = `SPEND_ACCOUNT_CONTRACT_ID`. Owner `STELLAR_RECIPIENT_SECRET` signs `Vec<AccSignature>` (stock `@x402/stellar` 2.12 does not forward `authorizeEntry`).
+- **Live classic:** `createEd25519Signer(STELLAR_SECRET_KEY, "stellar:testnet")` if no C… is set.
 
-`.env` at the repo root: `STELLAR_SECRET_KEY`, `STELLAR_RPC_URL`, `API_PORT`.
+`.env` at the repo root: `SPEND_ACCOUNT_CONTRACT_ID`, `STELLAR_RECIPIENT_SECRET`, `STELLAR_SECRET_KEY`, `STELLAR_RPC_URL`, `API_PORT`. Never commit secrets.

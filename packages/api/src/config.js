@@ -128,7 +128,11 @@ export function verifyNotes() {
   const notes = liveBlockers();
   if (!config.spendAccountContractId) {
     notes.push(
-      "Optional next step: deploy contracts/spend-account and set SPEND_ACCOUNT_CONTRACT_ID. Live x402 settle uses a classic G... payer; the contract cap is not the settle path.",
+      "Set SPEND_ACCOUNT_CONTRACT_ID to your deployed spend-account C... so live Exact `from` is the contract and `__check_auth` enforces the on-chain daily cap.",
+    );
+  } else if (config.mode === "live") {
+    notes.push(
+      "Live Exact `from` is SPEND_ACCOUNT_CONTRACT_ID. Agent signs auth entries with STELLAR_RECIPIENT_SECRET (constructor owner). Fund the C... with testnet USDC.",
     );
   }
   return notes;
@@ -154,11 +158,6 @@ export function liveStatusFields() {
         error: facilitatorState.error,
         kinds: facilitatorState.kinds,
       },
-    },
-    spendAccount: {
-      contractId: config.spendAccountContractId || null,
-      enforcesLiveTransfers: false,
-      note: "On-chain daily cap applies only if the x402 `from` is this contract account. The Node signer is createEd25519Signer on a classic G.... UI cap stays local.",
     },
   };
 }

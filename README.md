@@ -24,11 +24,11 @@ sequenceDiagram
   participant Chain as Stellar testnet
   participant SA as spend-account
 
-  Human->>API: POST /v1/budget (daily USDC cap)
-  Note over Human,SA: Live: also set_daily_limit on the contract account
+  Human->>API: GET /v1/status (on-chain remaining)
+  Note over Human,SA: Live cards read spend-account; POST /v1/budget is stub/UI only
   Agent->>API: GET /v1/fx?pair=USD-MXN
   API-->>Agent: 402 PAYMENT-REQUIRED (Exact, USDC, stellar:testnet)
-  Agent->>Agent: createEd25519Signer — sign auth entries
+  Agent->>Agent: sign spend-account AccSignature (owner ed25519)
   Agent->>API: GET + PAYMENT-SIGNATURE
   API->>OZ: /verify then /settle
   OZ->>Chain: USDC SAC transfer (fees sponsored)
@@ -64,14 +64,14 @@ There is **no** official spend-account contract id. `scripts/deploy-testnet.sh` 
 | --- | --- | --- |
 | Trigger | `OZ_API_KEY` or classic `STELLAR_RECIPIENT` missing (`X402_MODE=auto`) | both set — stub **off** |
 | 402 | local Exact-shaped body | `@x402/express` + OZ `/verify` + `/settle` |
-| Daily cap | in-memory UTC day (UI / `--until-cap`) | same UI mirror; on-chain cap only if spend-account is the payer |
-| USDC movement | none | Exact transfer on the official testnet USDC SAC |
+| Daily cap | in-memory UTC day (UI / `--until-cap`) | **spend-account `__check_auth`** when `SPEND_ACCOUNT_CONTRACT_ID` is set (Exact `from` = that C…); otherwise the in-process dashboard store |
+| USDC movement | none | Exact transfer **from the spend-account C…** (or classic G… if no contract id) on the official testnet USDC SAC |
 
-`GET /v1/status` reports `mode`, `settle` (`stub` \| `oz-facilitator`), facilitator probe, and Horizon trustline for the merchant. `X402_MODE=stub` forces stub even with keys.
+`GET /v1/status` reports `mode`, `settle` (`stub` \| `oz-facilitator`), facilitator probe, Horizon trustline, and `spendAccount` (on-chain `daily_limit` / `spent_today` / `remaining` when a C… is set). `X402_MODE=stub` forces stub even with keys. The dashboard setter does not call `set_daily_limit`.
 
 ## Live settle checklist
 
-Nine steps. Secrets stay in your local `.env` — never commit them.
+Ten steps. Secrets stay in your local `.env` — never commit them.
 
 1. `cp .env.example .env`
 2. Two testnet accounts: merchant `G...` (`STELLAR_RECIPIENT`) and payer `S...` (`STELLAR_SECRET_KEY`). Lab: https://lab.stellar.org/account/create
@@ -81,9 +81,10 @@ Nine steps. Secrets stay in your local `.env` — never commit them.
 6. OZ testnet key: https://channels.openzeppelin.com/testnet/gen → `OZ_API_KEY`
 7. Confirm `.env` has `STELLAR_NETWORK=stellar:testnet`, `FACILITATOR_URL=https://channels.openzeppelin.com/x402/testnet`, official `USDC_ISSUER` / `USDC_SAC`
 8. `npm run dev:api` — `GET /v1/status` must show `"mode":"live"` and `settle: "oz-facilitator"` (clear error if the key or payTo is wrong)
-9. `npm run start -w @agentpaywall/agent -- --pair USD-MXN --verbose` — **200** + mock FX after a real Exact settle, or a **clear** `UNDERFUNDED` / `NO_TRUSTLINE` / `FACILITATOR_AUTH` error
+9. Set `SPEND_ACCOUNT_CONTRACT_ID` to your deployed C… and `STELLAR_RECIPIENT_SECRET` to the **constructor owner** S… (same G… as `STELLAR_RECIPIENT`). Fund that C… with testnet USDC. `GET /v1/status` must show `spendAccount.enforcesLiveTransfers: true` and `spendAccount.source: "on-chain"` (remaining/spent/limit from simulate, not `DAILY_CAP_USDC`).
+10. `npm run start -w @agentpaywall/agent -- --pair USD-MXN --verbose` — signer `from` is the C…, **200** + mock FX after a real Exact settle, or a **clear** `UNDERFUNDED` / `NO_TRUSTLINE` / `FACILITATOR_AUTH` / `DAILY_CAP_EXCEEDED` error
 
-`payTo` is the merchant **G...**, not the SAC. The agent uses `createEd25519Signer` + `wrapFetchWithPaymentFromConfig`. Spend-account deploy (`scripts/deploy-testnet.sh`) is optional and does **not** gate this path.
+`payTo` is the merchant **G...**, not the SAC. Live Exact **from** is `SPEND_ACCOUNT_CONTRACT_ID` when set. The agent wraps `@x402/stellar` Exact because 2.12.x does not forward `authorizeEntry` for contract accounts. Owner ed25519 over the auth payload becomes `Vec<AccSignature>` for `__check_auth`.
 
 ## Repo layout
 
@@ -138,16 +139,16 @@ Or `bash scripts/demo.sh` (API must already be up). `bash scripts/demo.sh --unti
 - [ ] Agent `--until-cap` → **DAILY_CAP_EXCEEDED**
 - [ ] Read [docs/JUDGES.md](docs/JUDGES.md)
 
-## Optional: on-chain daily cap
+## On-chain daily cap (live demo)
 
-Live settle above uses a **classic G... payer**. `contracts/spend-account` can refuse USDC `transfer` in `__check_auth`, but only when that contract account is the `from` on the SAC call. The Node CLI does not sign as a contract account yet.
+Live Exact pays **from** `SPEND_ACCOUNT_CONTRACT_ID` so Soroban `__check_auth` can return `DailyCapExceeded` / `cap_hit`. Do not invent a C… — paste the id `scripts/deploy-testnet.sh` printed. Constructor `owner` must be the merchant G… (`STELLAR_RECIPIENT`); the agent signs auth entries with `STELLAR_RECIPIENT_SECRET`. Fund the **contract** with testnet USDC (parent/demo wallets do this; this repo never stores secrets).
+
+The web UI cap still works for **stub**. Live `--until-cap` loops until the contract refuses.
 
 ```bash
 bash scripts/deploy-testnet.sh          # notes + build; deploy if STELLAR_DEPLOY_IDENTITY is set
 bash scripts/deploy-testnet.sh --notes-only
 ```
-
-Paste the printed `C...` into `SPEND_ACCOUNT_CONTRACT_ID`. Do not invent one. The web UI cap remains the dashboard / stub `--until-cap` demo.
 
 ## Docs
 

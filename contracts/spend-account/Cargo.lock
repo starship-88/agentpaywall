@@ -1189,15 +1189,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
-name = "spend-account"
-version = "0.1.0"
-dependencies = [
- "ed25519-dalek 1.0.1",
- "rand 0.7.3",
- "soroban-sdk",
-]
-
-[[package]]
 name = "soroban-builtin-sdk-macros"
 version = "22.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1384,6 +1375,15 @@ dependencies = [
  "wasmi_arena",
  "wasmi_core",
  "wasmparser-nostd",
+]
+
+[[package]]
+name = "spend-account"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek 1.0.1",
+ "rand 0.7.3",
+ "soroban-sdk",
 ]
 
 [[package]]
