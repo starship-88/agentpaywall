@@ -40,6 +40,12 @@ Live x402 Exact pays **FROM** that C… (`spendAccount.enforcesLiveTransfers: tr
 
 `spent_today` / `remaining` move when someone pays or the UTC day rolls. Re-read `/v1/status`; do not treat the snapshot as a constant.
 
+![Dashboard — on-chain daily cap, spent, remaining](docs/shots/dashboard.png)
+
+*Local `npm run preview -w @agentpaywall/web` reading this deploy’s `spendAccount` (`source: "on-chain"`, remaining 0.06 USDC after the 2026-09-13 UTC roll). The mode badge is stub when `OZ_API_KEY` is unset; the cards still simulate the C-account.*
+
+![Markets — unpaid 402 FX pairs](docs/shots/markets.png)
+
 ## Pitch
 
 Agents will empty a hot wallet if the only control is “please don’t loop.” AgentPaywall splits roles:
