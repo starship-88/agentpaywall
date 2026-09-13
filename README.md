@@ -1,8 +1,50 @@
 # AgentPaywall
 
-Per-request **USDC** for HTTP APIs, using **x402 on Stellar**. A **human** sets a daily spend cap. An **agent** pays. When the cap is gone, **Soroban `__check_auth` refuses the transfer** — the adversarial demo is a failed on-chain settle, not a polite 429 in Node.
+Per-request **USDC** for HTTP APIs — **x402 on Stellar**. A human sets a daily cap; the agent pays; when the cap is gone, **Soroban `__check_auth` refuses the transfer**.
 
-Built for **HackMeridian Lisboa / Stellar Pro**.
+**Judges (HackMeridian Lisboa, 25–26 Oct 2026):** start at [docs/JUDGES.md](docs/JUDGES.md). Live demo C-account and `--until-cap` path are there.
+
+```bash
+npm install
+npm run dev:api          # http://127.0.0.1:40211
+npm run dev:web          # http://127.0.0.1:41791  (Aave-style dashboard)
+npm run start -w @agentpaywall/agent -- --until-cap
+```
+
+Leave `.env` empty for stub. Live settle needs local secrets — never commit them.
+
+## Live testnet demo
+
+The C-account below is **this deploy** (already on `stellar:testnet`). It is **not** an official constant. Deploy your own with `scripts/deploy-testnet.sh`.
+
+| | |
+| --- | --- |
+| Spend-account (this deploy) | `CAPRBG7V5JQRGWNQ5Z5AKRQ4X46G3UJRQNVXLUKZIWHEHWBNAMBBNRR5` |
+| StellarExpert (testnet) | [contract page](https://stellar.expert/explorer/testnet/contract/CAPRBG7V5JQRGWNQ5Z5AKRQ4X46G3UJRQNVXLUKZIWHEHWBNAMBBNRR5) |
+| Horizon | No C-account page — Horizon `/accounts/{id}` is **G… only** |
+
+Live x402 Exact pays **FROM** that C… (`spendAccount.enforcesLiveTransfers: true`).
+
+`GET /v1/status` → `spendAccount` after UTC day rollover **2026-09-13** (`source: "on-chain"`):
+
+```json
+{
+  "contractId": "CAPRBG7V5JQRGWNQ5Z5AKRQ4X46G3UJRQNVXLUKZIWHEHWBNAMBBNRR5",
+  "enforcesLiveTransfers": true,
+  "source": "on-chain",
+  "dailyLimitUsdc": 0.06,
+  "spentTodayUsdc": 0,
+  "remainingUsdc": 0.06
+}
+```
+
+`spent_today` / `remaining` move when someone pays or the UTC day rolls. Re-read `/v1/status`; do not treat the snapshot as a constant.
+
+![Dashboard — on-chain daily cap, spent, remaining](docs/shots/dashboard.png)
+
+*Local `npm run preview -w @agentpaywall/web` reading this deploy’s `spendAccount` (`source: "on-chain"`, remaining 0.06 USDC after the 2026-09-13 UTC roll). The mode badge is stub when `OZ_API_KEY` is unset; the cards still simulate the C-account.*
+
+![Markets — unpaid 402 FX pairs](docs/shots/markets.png)
 
 ## Pitch
 
@@ -54,7 +96,7 @@ sequenceDiagram
 | OZ facilitator | `https://channels.openzeppelin.com/x402/testnet` |
 | OZ API key | generate at https://channels.openzeppelin.com/testnet/gen |
 
-There is **no** official spend-account contract id. `scripts/deploy-testnet.sh` prints **your** `C...` after deploy. Leave `SPEND_ACCOUNT_CONTRACT_ID` empty until then.
+There is **no** official spend-account contract id. `scripts/deploy-testnet.sh` prints **your** `C...` after deploy. Leave `SPEND_ACCOUNT_CONTRACT_ID` empty until then. This repo’s already-deployed demo C… is in [Live testnet demo](#live-testnet-demo) — paste that only if you intend to hit **this** instance.
 
 `payTo` on the API is a classic **G...** account with a USDC trustline, not the SAC.
 

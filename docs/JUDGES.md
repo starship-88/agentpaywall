@@ -22,16 +22,20 @@ Official network/asset/facilitator only:
 - USDC SAC: `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA`
 - OZ facilitator: `https://channels.openzeppelin.com/x402/testnet`
 
-There is **no** official spend-account `C...` constant. Deploy yours with `scripts/deploy-testnet.sh`. This repo’s live demo instance (testnet, already deployed — not an official constant) is `CAPRBG7V5JQRGWNQ5Z5AKRQ4X46G3UJRQNVXLUKZIWHEHWBNAMBBNRR5`.
+There is **no** official spend-account `C...` constant. Deploy yours with `scripts/deploy-testnet.sh`. This repo’s live demo instance (testnet, already deployed — **this deploy**, not an official constant) is `CAPRBG7V5JQRGWNQ5Z5AKRQ4X46G3UJRQNVXLUKZIWHEHWBNAMBBNRR5`.
+
+Explorer: [StellarExpert testnet contract](https://stellar.expert/explorer/testnet/contract/CAPRBG7V5JQRGWNQ5Z5AKRQ4X46G3UJRQNVXLUKZIWHEHWBNAMBBNRR5). Horizon has no C-account page (`/accounts/{id}` is G… only).
+
+After UTC day rollover **2026-09-13**, `GET /v1/status` `spendAccount` on this deploy (`source: "on-chain"`): `dailyLimitUsdc` **0.06**, `spentTodayUsdc` **0**, `remainingUsdc` **0.06**, `enforcesLiveTransfers` **true**. Live Exact `from` is that C…. Numbers change after a pay or the next UTC roll.
 
 ## Adversarial demo (cap hit)
 
-**Live (judges path):** budget lives in `__check_auth`, not the bot config or the dashboard setter.
+**Live (judges path):** budget lives in `__check_auth`, not the bot config or the dashboard setter. The CLI flag is `--until-cap` (C-account remaining, not the in-memory store).
 
-1. Open the web UI. Daily cap / Spent / Remaining must show an **on-chain** badge and match `GET /v1/status` `spendAccount` (`remainingBaseUnits` is `0` after this instance’s `--until-cap` until the UTC day rolls).
+1. Open the web UI. Daily cap / Spent / Remaining must show an **on-chain** badge and match `GET /v1/status` `spendAccount` (see snapshot above after the 2026-09-13 UTC roll).
 2. Human looks at **web remaining (on-chain)** — not the in-memory `DAILY_CAP_USDC` setter. That setter is stub/UI only and does **not** call `set_daily_limit`.
 3. `npm run start -w @agentpaywall/agent -- --until-cap` until **CAP_HIT** (`DailyCapExceeded` / `DAILY_CAP_EXCEEDED`).
-4. Cards stay at on-chain remaining `0`. Live Exact `from` is the C… above.
+4. Cards then show on-chain remaining `0` until the next UTC day. Live Exact `from` is the C… above.
 
 **Stub** (no `SPEND_ACCOUNT_CONTRACT_ID`): set the in-memory cap to two quotes (`0.002` USDC at `$0.001`) and run the same loop. Proves the HTTP 402 → pay → 200 path without an OZ key.
 
