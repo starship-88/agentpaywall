@@ -83,12 +83,17 @@ export type Status = {
 
 export type ProbeKind = "unpaid" | "paid" | "cap" | "error";
 
+export type ProbeCode = "DAILY_CAP_EXCEEDED" | "PAYMENT_REQUIRED" | "PAID" | "ERROR";
+
 export type ProbeResult = {
   pair: string;
   httpStatus: number;
   kind: ProbeKind;
+  code: ProbeCode;
   paymentRequiredHeader: boolean;
-  summary: string;
+  remainingUsdc?: number;
+  rate?: number;
+  source?: string;
   body: unknown;
   at: string;
 };

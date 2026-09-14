@@ -7,7 +7,7 @@ Per-request **USDC** for HTTP APIs — **x402 on Stellar**. A human sets a daily
 ```bash
 npm install
 npm run dev:api          # http://127.0.0.1:40211
-npm run dev:web          # http://127.0.0.1:41791  (Aave-style dashboard)
+npm run dev:web          # http://127.0.0.1:41791  (light lavender dashboard, EN/ES)
 npm run start -w @agentpaywall/agent -- --until-cap
 ```
 

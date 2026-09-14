@@ -1,4 +1,5 @@
-import type { Budget, EventKind, Status } from "./types";
+import { getLocale, localeTag, type Locale } from "./i18n";
+import type { Budget, Status } from "./types";
 
 export type MetricSource = "on-chain" | "stub" | "unavailable";
 
@@ -15,8 +16,7 @@ export function metricBudget(status: Status | null): {
   error?: string;
 } {
   const sa = status?.spendAccount;
-  const useChain =
-    sa?.source === "on-chain" || Boolean(sa?.enforcesLiveTransfers);
+  const useChain = sa?.source === "on-chain" || Boolean(sa?.enforcesLiveTransfers);
   if (!useChain) {
     return { budget: status?.budget ?? null, source: "stub" };
   }
@@ -29,8 +29,7 @@ export function metricBudget(status: Status | null): {
         remainingBaseUnits: String(sa.remainingBaseUnits ?? "0"),
         spentBaseUnits: String(sa.spentTodayBaseUnits ?? "0"),
         dailyCapBaseUnits: String(sa.dailyLimitBaseUnits ?? "0"),
-        priceBaseUnits:
-          status?.budget?.priceBaseUnits ?? status?.priceBaseUnits ?? "10000",
+        priceBaseUnits: status?.budget?.priceBaseUnits ?? status?.priceBaseUnits ?? "10000",
       },
       source: "on-chain",
     };
@@ -38,27 +37,34 @@ export function metricBudget(status: Status | null): {
   return { budget: null, source: "unavailable", error: sa.error };
 }
 
-export function formatUsdc(n?: number, digits = 4): string {
+export function formatUsdc(n?: number, digits = 4, locale?: Locale): string {
   if (n == null || Number.isNaN(n)) return "—";
-  return n.toLocaleString("en-US", {
+  return n.toLocaleString(localeTag(locale ?? getLocale()), {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
 }
 
-export function formatRate(n?: number): string {
+export function formatRate(n?: number, locale?: Locale): string {
   if (n == null || Number.isNaN(n)) return "—";
   const digits = n >= 100 ? 2 : n >= 1 ? 4 : 6;
-  return n.toLocaleString("en-US", {
+  return n.toLocaleString(localeTag(locale ?? getLocale()), {
     minimumFractionDigits: 2,
     maximumFractionDigits: digits,
   });
 }
 
-export function formatUtc(iso: string): string {
+export function formatDateTime(iso: string, locale?: Locale): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toISOString().replace("T", " ").replace(".000Z", " UTC").replace("Z", " UTC");
+  return d.toLocaleString(localeTag(locale ?? getLocale()), {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 export function priceUsdcFromBudget(priceBaseUnits?: string, fallbackPrice?: string): number {
@@ -88,19 +94,4 @@ export function healthTone(remainingUsdc: number, capUsdc: number, priceUsdc: nu
   const ratio = remainingUsdc / capUsdc;
   if (ratio <= 0.15) return "warn" as const;
   return "ok" as const;
-}
-
-export function kindLabel(kind: EventKind): string {
-  switch (kind) {
-    case "paid":
-      return "paid";
-    case "402":
-      return "402";
-    case "cap":
-      return "cap";
-    case "error":
-      return "error";
-    default:
-      return "info";
-  }
 }

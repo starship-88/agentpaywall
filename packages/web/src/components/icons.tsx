@@ -85,16 +85,18 @@ export function IconExternal(props: IconProps) {
   );
 }
 
+/** Original AgentPaywall mark — not an Aave / Aave App trademark. */
 export function BrandMark({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden>
-      <rect width="32" height="32" rx="9" fill="#121a2b" />
-      <rect x="0.6" y="0.6" width="30.8" height="30.8" rx="8.4" stroke="#2ec7c0" strokeOpacity="0.45" />
+      <rect width="32" height="32" rx="10" fill="#7b6cff" />
+      <circle cx="16" cy="16" r="7.2" stroke="#ffffff" strokeWidth="2.1" />
       <path
-        d="M8 22.2 16 7.8l8 14.4h-3.1L16 12.6l-4.9 9.6H8Z"
-        fill="#2ec7c0"
+        d="M16 11.2v9.6M12.4 14.6h7.2"
+        stroke="#ffffff"
+        strokeWidth="2.1"
+        strokeLinecap="round"
       />
-      <path d="M12.4 22.2h7.2L16 16.1 12.4 22.2Z" fill="#9ef2e0" />
     </svg>
   );
 }

@@ -17,10 +17,16 @@ import {
   setDailyCap,
 } from "./lib/api";
 import { hashForView, viewFromHash } from "./lib/hash";
+import { applyDocumentMeta } from "./lib/i18n";
 import { metricBudget, priceUsdcFromBudget } from "./lib/format";
 import type { EventRow, PairRow, ProbeResult, Status, View } from "./lib/types";
+import { useI18n } from "./lib/useI18n";
+
+type Flash = { kind: "saved"; n: number } | { kind: "reset" } | null;
+type AppError = { kind: "apiDown" } | { kind: "save" } | { kind: "reset" } | { kind: "text"; text: string } | null;
 
 export default function App() {
+  const { t, locale } = useI18n();
   const [view, setView] = useState<View>(() =>
     typeof window === "undefined" ? "dashboard" : viewFromHash(),
   );
@@ -28,14 +34,18 @@ export default function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [pairs, setPairs] = useState<PairRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AppError>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [capInput, setCapInput] = useState("0.01");
   const hydratedCap = useRef(false);
-  const [flash, setFlash] = useState<string | null>(null);
+  const [flash, setFlash] = useState<Flash>(null);
   const [probe, setProbe] = useState<ProbeResult | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    applyDocumentMeta(locale);
+  }, [locale]);
 
   const load = useCallback(async (quiet = true) => {
     if (!quiet) setLoading(true);
@@ -55,7 +65,7 @@ export default function App() {
         setCapInput(String(s.budget.dailyCapUsdc));
       }
     } catch {
-      setError(`Cannot reach API at ${API_URL}. Start it with npm run dev:api.`);
+      setError({ kind: "apiDown" });
     } finally {
       setLoading(false);
     }
@@ -100,10 +110,10 @@ export default function App() {
     try {
       const n = Number(capInput);
       await setDailyCap(n);
-      setFlash(`Daily cap set to ${n} USDC`);
+      setFlash({ kind: "saved", n });
       await load(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "save failed");
+    } catch {
+      setError({ kind: "save" });
     } finally {
       setBusy(false);
     }
@@ -114,10 +124,10 @@ export default function App() {
     setFlash(null);
     try {
       await resetBudgetWindow();
-      setFlash("Spend window reset");
+      setFlash({ kind: "reset" });
       await load(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "reset failed");
+    } catch {
+      setError({ kind: "reset" });
     } finally {
       setBusy(false);
     }
@@ -135,9 +145,9 @@ export default function App() {
         pair,
         httpStatus: 0,
         kind: "error",
+        code: "ERROR",
         paymentRequiredHeader: false,
-        summary: err instanceof Error ? err.message : "probe failed",
-        body: null,
+        body: { message: err instanceof Error ? err.message : t("error.probeFailed") },
         at: new Date().toISOString(),
       });
     } finally {
@@ -145,73 +155,94 @@ export default function App() {
     }
   }
 
+  const errorText =
+    error?.kind === "apiDown"
+      ? t("error.apiDown", { url: API_URL })
+      : error?.kind === "save"
+        ? t("budget.saveFailed")
+        : error?.kind === "reset"
+          ? t("budget.resetFailed")
+          : error?.kind === "text"
+            ? error.text
+            : null;
+
+  const flashText =
+    flash?.kind === "saved"
+      ? t("budget.flashSaved", { n: flash.n })
+      : flash?.kind === "reset"
+        ? t("budget.flashReset")
+        : null;
+
   return (
-    <div className="min-h-dvh bg-ap-bg text-white">
+    <div className="min-h-dvh text-ap-ink">
       <Sidebar
         view={view}
         onNavigate={navigate}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
       />
-      <div className="lg:pl-[248px]">
-        <TopBar
-          status={status}
-          loading={loading}
-          onRefresh={() => void load(false)}
-          onOpenMenu={() => setMobileOpen(true)}
-          updatedAt={updatedAt}
-        />
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-          {error ? (
-            <div className="mb-5 rounded-xl border border-ap-danger/35 bg-ap-danger/10 px-4 py-3 text-sm text-ap-danger">
-              {error}
+      <TopBar
+        view={view}
+        status={status}
+        loading={loading}
+        onRefresh={() => void load(false)}
+        onOpenMenu={() => setMobileOpen(true)}
+        onNavigate={navigate}
+        updatedAt={updatedAt}
+      />
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        {errorText ? (
+          <div className="mb-5 rounded-2xl border border-ap-danger/25 bg-ap-danger/8 px-4 py-3 text-sm text-ap-danger">
+            {errorText}
+          </div>
+        ) : null}
+
+        {view === "dashboard" ? (
+          <Dashboard
+            status={status}
+            events={events}
+            pairs={pairs}
+            loading={loading}
+            busy={busy}
+            priceUsdc={priceUsdc}
+            capInput={capInput}
+            onCapInput={setCapInput}
+            onSave={() => void saveCap()}
+            onReset={() => void resetWindow()}
+            flash={flashText}
+            onProbe={(pair) => void onProbe(pair)}
+            onSeeActivity={() => navigate("activity")}
+            onSeeMarkets={() => navigate("markets")}
+          />
+        ) : null}
+
+        {view === "markets" ? (
+          <MarketsTable
+            pairs={pairs}
+            loading={loading}
+            busy={busy}
+            probe={probe}
+            onProbe={(pair) => void onProbe(pair)}
+            priceUsdc={priceUsdc}
+          />
+        ) : null}
+
+        {view === "activity" ? (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-[1.75rem] font-semibold tracking-tight text-ap-ink">
+                {t("activity.title")}
+              </h2>
+              <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ap-body">
+                {t("activity.lead")}
+              </p>
             </div>
-          ) : null}
+            <ActivityTable events={events} />
+          </div>
+        ) : null}
 
-          {view === "dashboard" ? (
-            <Dashboard
-              status={status}
-              events={events}
-              pairs={pairs}
-              loading={loading}
-              busy={busy}
-              priceUsdc={priceUsdc}
-              capInput={capInput}
-              onCapInput={setCapInput}
-              onSave={() => void saveCap()}
-              onReset={() => void resetWindow()}
-              flash={flash}
-              onProbe={(pair) => void onProbe(pair)}
-              onSeeActivity={() => navigate("activity")}
-              onSeeMarkets={() => navigate("markets")}
-            />
-          ) : null}
-
-          {view === "markets" ? (
-            <MarketsTable
-              pairs={pairs}
-              loading={loading}
-              busy={busy}
-              probe={probe}
-              onProbe={(pair) => void onProbe(pair)}
-            />
-          ) : null}
-
-          {view === "activity" ? (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight text-white">Activity</h2>
-                <p className="mt-1 text-[13px] text-ap-muted">
-                  402 → signed retry → settle. Cap hits and errors belong here.
-                </p>
-              </div>
-              <ActivityTable events={events} />
-            </div>
-          ) : null}
-
-          {view === "docs" ? <DocsView status={status} /> : null}
-        </main>
-      </div>
+        {view === "docs" ? <DocsView status={status} /> : null}
+      </main>
     </div>
   );
 }
@@ -247,16 +278,34 @@ function Dashboard({
   onSeeActivity: () => void;
   onSeeMarkets: () => void;
 }) {
+  const { t } = useI18n();
   const metrics = metricBudget(status);
+
+  function scrollToBudget() {
+    document.getElementById("budget")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-white">Dashboard</h1>
-        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-ap-muted">
-          Daily USDC budget for x402 Exact on Stellar. The agent CLI pays; this
-          console never signs a PAYMENT-SIGNATURE.
+    <div className="space-y-6">
+      <section className="mx-auto max-w-3xl pb-2 text-center sm:pb-4">
+        <p className="text-[13px] font-medium tracking-wide text-ap-purple-deep">
+          {t("overview.kicker")}
         </p>
-      </div>
+        <h1 className="mt-2 text-[2.35rem] leading-[1.1] font-semibold tracking-tight text-ap-ink sm:text-5xl">
+          {t("overview.title")}
+        </h1>
+        <p className="mx-auto mt-4 max-w-xl text-[16px] leading-relaxed text-ap-body">
+          {t("overview.lead")}
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button type="button" className="ap-btn-primary" onClick={scrollToBudget}>
+            {t("overview.ctaBudget")}
+          </button>
+          <button type="button" className="ap-btn-ghost" onClick={onSeeMarkets}>
+            {t("overview.ctaQuote")}
+          </button>
+        </div>
+      </section>
 
       <MetricCards
         budget={metrics.budget}
@@ -284,9 +333,13 @@ function Dashboard({
         </div>
         <div className="lg:col-span-3">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">Recent activity</h2>
-            <button type="button" className="text-[12px] text-ap-cyan hover:underline" onClick={onSeeActivity}>
-              View all
+            <h2 className="text-sm font-semibold text-ap-ink">{t("overview.recent")}</h2>
+            <button
+              type="button"
+              className="text-[12px] font-medium text-ap-purple-deep hover:underline"
+              onClick={onSeeActivity}
+            >
+              {t("overview.seeAll")}
             </button>
           </div>
           <ActivityTable events={events} compact />
@@ -295,9 +348,13 @@ function Dashboard({
 
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">Markets</h2>
-          <button type="button" className="text-[12px] text-ap-cyan hover:underline" onClick={onSeeMarkets}>
-            Open markets
+          <h2 className="text-sm font-semibold text-ap-ink">{t("overview.quotes")}</h2>
+          <button
+            type="button"
+            className="text-[12px] font-medium text-ap-purple-deep hover:underline"
+            onClick={onSeeMarkets}
+          >
+            {t("overview.openQuotes")}
           </button>
         </div>
         <MarketsTable
@@ -307,6 +364,7 @@ function Dashboard({
           probe={null}
           onProbe={onProbe}
           embedded
+          priceUsdc={priceUsdc}
         />
       </div>
     </div>
