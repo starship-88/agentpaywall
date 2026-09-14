@@ -67,44 +67,35 @@ export async function probeFx(pair: string): Promise<ProbeResult> {
   const error = typeof rec.error === "string" ? rec.error : "";
 
   let kind: ProbeResult["kind"] = "error";
-  let summary: string;
+  let code: ProbeResult["code"] = "ERROR";
+  let remainingUsdc: number | undefined;
+  let rate: number | undefined;
+  let source: string | undefined;
 
-  if (error === "DAILY_CAP_EXCEEDED" || res.status === 402 && error.includes("CAP")) {
+  if (error === "DAILY_CAP_EXCEEDED" || (res.status === 402 && error.includes("CAP"))) {
     kind = "cap";
-    const remaining =
-      typeof rec.remainingUsdc === "number" ? formatRemaining(rec.remainingUsdc) : "0";
-    summary = `Daily cap would be exceeded. Remaining ${remaining} USDC. This request was not settled.`;
+    code = "DAILY_CAP_EXCEEDED";
+    remainingUsdc = typeof rec.remainingUsdc === "number" ? rec.remainingUsdc : 0;
   } else if (res.status === 402 || error === "PAYMENT_REQUIRED") {
     kind = "unpaid";
-    summary =
-      "PAYMENT-REQUIRED. This UI does not sign. Run the agent CLI to pay $0.001 USDC and retry.";
+    code = "PAYMENT_REQUIRED";
   } else if (res.ok && typeof rec.rate === "number") {
     kind = "paid";
-    summary = `Paid quote ${pair} @ ${rec.rate} (${String(rec.source ?? "FX")}).`;
-  } else {
-    kind = "error";
-    summary =
-      typeof rec.message === "string"
-        ? rec.message
-        : typeof rec.error === "string"
-          ? rec.error
-          : `Unexpected ${res.status}`;
+    code = "PAID";
+    rate = rec.rate;
+    source = typeof rec.source === "string" ? rec.source : "FX";
   }
 
   return {
     pair,
     httpStatus: res.status,
     kind,
+    code,
     paymentRequiredHeader,
-    summary,
+    remainingUsdc,
+    rate,
+    source,
     body,
     at: new Date().toISOString(),
   };
-}
-
-function formatRemaining(n: number): string {
-  return n.toLocaleString("en-US", {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 4,
-  });
 }

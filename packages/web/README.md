@@ -1,8 +1,10 @@
 # `@agentpaywall/web`
 
-Dark DeFi dashboard for the human budget: daily USDC cap, FX markets, and activity. Styled after typical Aave-like consoles (sidebar, metric cards, markets table) without Aave trademarks.
+Light lavender console for the human budget: daily USDC cap, FX quotes, and activity. Styled after a marketing-app look (airy gradient, pill buttons, soft cards) without third-party trademarks.
 
-The agent is the CLI — this UI does **not** sign x402 payments. **Pay & quote** probes `GET /v1/fx` and should return **402 PAYMENT-REQUIRED**.
+English and Spanish share one `i18n` dictionary. The language switcher (EN | ES) persists in `localStorage` (`agentpaywall.lang`) and defaults to the browser language when it starts with `es`.
+
+The agent is the CLI — this UI does **not** sign x402 payments. **Get a quote (pay)** probes `GET /v1/fx` and should return **402 PAYMENT-REQUIRED**.
 
 ```bash
 npm run dev:web
